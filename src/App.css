@@ -1,0 +1,46 @@
+.container {
+    border: 1px solid #e1e4e8;
+    padding-block: 0.6em;
+    padding-inline: 1em;
+}
+
+.stack-container {
+    background-color: #f6f8fa;
+}
+
+.stack-content {
+    display: flex;
+    flex-direction: column;
+    flex-wrap: wrap;
+    gap: 0.6em;
+}
+
+.stack-content > .container {
+    flex: 1 1 300px;
+    max-width: calc(50% - 0.5em);
+}
+
+.surface-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    background-color: rgba(0, 0, 0, 0.7);
+    color: white;
+    padding: 4px 8px;
+    font-size: 12px;
+    border-radius: 4px;
+    pointer-events: none;
+    z-index: 1000;
+}
+
+.surface-wrapper {
+    position: relative;
+    margin-bottom: 10px;
+}
+
+.toolbar {
+    display: flex;
+    flex-direction: row;
+    gap: 4px;
+    margin-bottom: 10px;
+}
