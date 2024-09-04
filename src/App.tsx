@@ -141,12 +141,7 @@ const surfaceProviders: SurfaceProvider[] = [CardProvider, StackProvider];
 const surfaceInstances = {} as Record<number, number[]>;
 
 const registerInstance = (id: number) => {
-  if (!surfaceInstances[id]) {
-    surfaceInstances[id] = [0];
-    return 0;
-  }
-
-  if (surfaceInstances[id].length === 0) {
+  if (!surfaceInstances[id] || surfaceInstances[id].length === 0) {
     surfaceInstances[id] = [0];
     return 0;
   }
