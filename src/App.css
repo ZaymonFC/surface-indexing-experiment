@@ -33,6 +33,11 @@
     z-index: 1000;
 }
 
+.surface-focused {
+    border: 2px solid #0366d6;
+    border-radius: 4px;
+}
+
 .surface-wrapper {
     position: relative;
 }
@@ -42,4 +47,18 @@
     flex-direction: row;
     gap: 4px;
     margin-bottom: 10px;
+}
+
+/* Utilities */
+.flex {
+    display: flex;
+}
+.flex-row {
+    flex-direction: row;
+}
+.flex-column {
+    flex-direction: column;
+}
+.gap-2 {
+    gap: 2px;
 }

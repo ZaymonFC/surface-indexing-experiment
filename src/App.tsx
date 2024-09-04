@@ -5,6 +5,8 @@ import { useValue } from "signia-react";
 import { atom } from "signia";
 import { produce } from "immer";
 import { useMemo } from "react";
+import { match } from "ts-pattern";
+import classNames from "classnames";
 
 // --- DATA  -------------------------------------------------------------------
 type Datum = (
@@ -43,6 +45,17 @@ const exampleData: Datum[] = [
     data: [reactCard, viteCard],
   },
 ];
+
+// --- DATA UTILITIES ----------------------------------------------------------
+const collectIds = (data: Datum[]): Set<number> => {
+  return new Set(
+    data.flatMap((datum) =>
+      match(datum)
+        .with({ type: "stack" }, (stack) => [stack.id, ...collectIds(stack.data)])
+        .otherwise((d) => [d.id]),
+    ),
+  );
+};
 
 // --- SURFACE PROVIDERS ------------------------------------------------------
 type SurfaceProvider = (data: Datum) => React.ReactElement | undefined;
@@ -107,7 +120,7 @@ const getSurfaceInstance = (id: number) => {
 // --- SURFACE COMPONENT ------------------------------------------------------
 
 function Surface({ datum }: { datum: Datum }) {
-  const { overlays } = useValue(state$);
+  const { overlays, focus } = useValue(state$);
 
   const provider = surfaceProviders.find((provider) => provider(datum));
   const instance = useMemo(() => getSurfaceInstance(datum.id), [datum.id]);
@@ -121,8 +134,12 @@ function Surface({ datum }: { datum: Datum }) {
     );
   }
 
+  const classes = classNames("surface-wrapper", {
+    "surface-focused": focus?.id === datum.id,
+  });
+
   return (
-    <div className="surface-wrapper">
+    <div className={classes}>
       <div role="none" data-surfaceid={datum.id} data-surfacetype={datum.type} data-surfaceinstance={instance}>
         {provider(datum)}
       </div>
@@ -136,12 +153,42 @@ function Surface({ datum }: { datum: Datum }) {
 }
 
 // --- APP LAND CODE ----------------------------------------------------------
-const state$ = atom("state", { overlays: true });
+type AppState = {
+  overlays: boolean;
+  focus?: { id: number; instance?: number };
+};
+
+const state$ = atom<AppState>("state", { overlays: true });
+
+type AppEvent = { type: "FOCUS_SURFACE"; id: number; instance?: number };
+
+const dispatch = (event: AppEvent) => {
+  console.log("Dispatching event", event);
+
+  switch (event.type) {
+    case "FOCUS_SURFACE": {
+      state$.update((state) =>
+        produce(state, (draft) => {
+          draft.focus = { id: event.id, instance: event.instance };
+        }),
+      );
+      break;
+    }
+  }
+};
 
 function App() {
   return (
-    <div role="main">
+    <div role="main" className="flex flex-column gap-2">
       <h1>Surface experiment ✨</h1>
+
+      <div role="none" className="flex flex-row gap-2">
+        {Array.from(collectIds(exampleData)).map((id) => (
+          <button key={id} onClick={() => dispatch({ type: "FOCUS_SURFACE", id })}>
+            {id}
+          </button>
+        ))}
+      </div>
 
       {exampleData.map((datum) => (
         <Surface key={datum.id} datum={datum} />
