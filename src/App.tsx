@@ -175,18 +175,30 @@ const nextInstance = (id: number, instance: number) => {
 // --- SURFACE COMPONENT ------------------------------------------------------
 const SurfaceContext = createContext<{ id: number; instance: number } | null>(null);
 
+/**
+ * Hook to manage surface instance IDs.
+ *
+ * This hook registers a new instance for a given datum ID when the component mounts,
+ * and removes the instance when the component unmounts. */
+const useSurfaceInstanceId = (id: number) => {
+  const [surfaceInstance, setSurfaceInstance] = useState<number | undefined>();
+
+  useEffect(() => {
+    const instance = registerInstance(id);
+    setSurfaceInstance(instance);
+    return () => removeInstance(id, instance);
+  }, [id]);
+
+  return surfaceInstance;
+};
+
+/** A component that renders a surface based on the provided datum. */
 function Surface({ datum }: { datum: Datum }) {
   const { overlays, focus } = useValue(state$);
   const parentContext = useContext(SurfaceContext);
 
   const provider = surfaceProviders.find((provider) => provider(datum));
-  const [surfaceInstance, setSurfaceInstance] = useState<number | undefined>();
-
-  useEffect(() => {
-    const instance = registerInstance(datum.id);
-    setSurfaceInstance(instance);
-    return () => removeInstance(datum.id, instance);
-  }, [datum.id]);
+  const surfaceInstance = useSurfaceInstanceId(datum.id);
 
   if (!provider) {
     return (
@@ -252,7 +264,6 @@ const dispatch = (event: AppEvent) => {
             return;
           }
 
-          console.log("Different!");
           const firstInstance = getInstances(event.surfaceId).at(0)!;
           draft.focus = {
             id: event.surfaceId,
