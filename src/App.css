@@ -1,11 +1,12 @@
 .container {
-    border: 1px solid #e1e4e8;
-    padding-block: 0.6em;
-    padding-inline: 1em;
+    border: 1px solid seagreen;
+    background-color: rgba(0, 0, 0.5, 0.08);
+    border-radius: 2px;
+    padding: 1em 0.6em;
 }
 
 .stack-container {
-    background-color: #f6f8fa;
+    background-color: rgba(0, 0, 0, 0.08);
 }
 
 .stack-content {
@@ -13,11 +14,6 @@
     flex-direction: column;
     flex-wrap: wrap;
     gap: 0.6em;
-}
-
-.stack-content > .container {
-    flex: 1 1 300px;
-    max-width: calc(50% - 0.5em);
 }
 
 .surface-overlay {
@@ -33,6 +29,12 @@
     z-index: 1000;
 }
 
+.surface-overlay code {
+    background-color: rgba(255, 255, 255, 0.2);
+    padding-inline: 2px;
+    border-radius: 2px;
+}
+
 .surface-focused {
     border: 2px solid #0366d6;
     border-radius: 4px;
@@ -42,11 +44,9 @@
     position: relative;
 }
 
-.toolbar {
-    display: flex;
-    flex-direction: row;
-    gap: 4px;
-    margin-bottom: 10px;
+.card {
+    font-size: 14px;
+    color: #24292e;
 }
 
 /* Utilities */

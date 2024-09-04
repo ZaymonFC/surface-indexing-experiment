@@ -4,7 +4,7 @@ import "./App.css";
 import { useValue } from "signia-react";
 import { atom } from "signia";
 import { produce } from "immer";
-import { useMemo } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 import { match } from "ts-pattern";
 import classNames from "classnames";
 
@@ -34,15 +34,31 @@ const viteCard: Datum = {
   },
 };
 
+const deepStack: Datum = {
+  id: 8,
+  type: "stack",
+  data: [viteCard],
+};
+
+const stack: Datum = {
+  id: 7,
+  type: "stack",
+  data: [reactCard, deepStack],
+};
+
+const anotherStack: Datum = {
+  id: 6,
+  type: "stack",
+  data: [reactCard, viteCard, stack],
+};
+
 const exampleData: Datum[] = [
-  { id: 1, type: "list", data: { items: ["React", "Vite"] } },
-  { id: 2, type: "list", data: { items: ["React", "Vite"] } },
   reactCard,
   viteCard,
   {
     id: 5,
     type: "stack",
-    data: [reactCard, viteCard],
+    data: [reactCard, viteCard, anotherStack, deepStack],
   },
 ];
 
@@ -82,8 +98,10 @@ const CardProvider: SurfaceProvider = (datum) => {
   if (datum.type !== "card") return;
 
   return (
-    <div className="container">
-      <p>I am a card surface.</p>
+    <div className="container card">
+      <p>
+        I am a <strong>card</strong> surface.
+      </p>
       <h2>{datum.data.title}</h2>
       <p>{datum.data.description}</p>
     </div>
@@ -95,7 +113,9 @@ const StackProvider: SurfaceProvider = (datum) => {
 
   return (
     <div className="container stack-container">
-      <p>I am a stack surface.</p>
+      <p>
+        I am a <strong>stack</strong> surface.
+      </p>
       <div className="stack-content">
         {datum.data.map((subDatum) => (
           <Surface key={subDatum.id} datum={subDatum} />
@@ -108,22 +128,55 @@ const StackProvider: SurfaceProvider = (datum) => {
 const surfaceProviders: SurfaceProvider[] = [ListProvider, CardProvider, StackProvider];
 
 // --- Instance management ----------------------------------------------------
-const surfaceInstances = {} as Record<number, number>;
+const surfaceInstances = {} as Record<number, number[]>;
 
-const getSurfaceInstance = (id: number) => {
+const registerInstance = (id: number) => {
   if (!surfaceInstances[id]) {
-    surfaceInstances[id] = 0;
+    surfaceInstances[id] = [0];
+    return 0;
   }
-  return surfaceInstances[id]++;
+
+  if (surfaceInstances[id].length === 0) {
+    surfaceInstances[id] = [0];
+    return 0;
+  }
+
+  const instance = Math.max(...surfaceInstances[id]) + 1;
+  surfaceInstances[id].push(instance);
+  return instance;
+};
+
+const removeInstance = (id: number, instance: number) => {
+  if (!surfaceInstances[id]) return;
+
+  const index = surfaceInstances[id].indexOf(instance);
+  if (index !== -1) {
+    surfaceInstances[id].splice(index, 1);
+  }
+};
+
+const getInstances = (id: number) => surfaceInstances[id] ?? [];
+const nextInstance = (id: number, instance: number) => {
+  const instances = getInstances(id);
+  const index = instances.indexOf(instance);
+  return instances[index + 1] ?? instances[0];
 };
 
 // --- SURFACE COMPONENT ------------------------------------------------------
+const SurfaceContext = createContext<{ id: number; instance: number } | null>(null);
 
 function Surface({ datum }: { datum: Datum }) {
   const { overlays, focus } = useValue(state$);
+  const parentContext = useContext(SurfaceContext);
 
   const provider = surfaceProviders.find((provider) => provider(datum));
-  const instance = useMemo(() => getSurfaceInstance(datum.id), [datum.id]);
+  const [surfaceInstance, setSurfaceInstance] = useState<number | undefined>();
+
+  useEffect(() => {
+    const instance = registerInstance(datum.id);
+    setSurfaceInstance(instance);
+    return () => removeInstance(datum.id, instance);
+  }, [datum.id]);
 
   if (!provider) {
     return (
@@ -135,20 +188,33 @@ function Surface({ datum }: { datum: Datum }) {
   }
 
   const classes = classNames("surface-wrapper", {
-    "surface-focused": focus?.id === datum.id,
+    "surface-focused": focus?.id === datum.id && focus?.instance === surfaceInstance,
   });
 
   return (
-    <div className={classes}>
-      <div role="none" data-surfaceid={datum.id} data-surfacetype={datum.type} data-surfaceinstance={instance}>
-        {provider(datum)}
-      </div>
-      {overlays && (
-        <div className="surface-overlay">
-          ID: <code>{datum.id}</code>, Type: <code>{datum.type}</code>, Instance: <code>{instance}</code>
+    <SurfaceContext.Provider value={{ id: datum.id, instance: surfaceInstance! }}>
+      <div className={classes}>
+        <div role="none" data-surfaceid={datum.id} data-surfacetype={datum.type} data-surfaceinstance={surfaceInstance}>
+          {provider(datum)}
         </div>
-      )}
-    </div>
+        {overlays && (
+          <div className="surface-overlay">
+            Coord:{" "}
+            <code>
+              {datum.id}:{surfaceInstance}
+            </code>
+            {parentContext && (
+              <>
+                , Parent:{" "}
+                <code>
+                  {parentContext.id}:{parentContext.instance}
+                </code>
+              </>
+            )}
+          </div>
+        )}
+      </div>
+    </SurfaceContext.Provider>
   );
 }
 
@@ -160,7 +226,7 @@ type AppState = {
 
 const state$ = atom<AppState>("state", { overlays: true });
 
-type AppEvent = { type: "FOCUS_SURFACE"; id: number; instance?: number };
+type AppEvent = { type: "FOCUS_SURFACE"; surfaceId: number };
 
 const dispatch = (event: AppEvent) => {
   console.log("Dispatching event", event);
@@ -169,7 +235,19 @@ const dispatch = (event: AppEvent) => {
     case "FOCUS_SURFACE": {
       state$.update((state) =>
         produce(state, (draft) => {
-          draft.focus = { id: event.id, instance: event.instance };
+          if (draft.focus?.id === event.surfaceId) {
+            // If the same surface is focused, move to the next instance
+            const next = nextInstance(event.surfaceId, draft.focus.instance!);
+            draft.focus = { id: event.surfaceId, instance: next };
+            return;
+          }
+
+          console.log("Different!");
+          const firstInstance = getInstances(event.surfaceId).at(0)!;
+          draft.focus = {
+            id: event.surfaceId,
+            instance: firstInstance,
+          };
         }),
       );
       break;
@@ -184,7 +262,7 @@ function App() {
 
       <div role="none" className="flex flex-row gap-2">
         {Array.from(collectIds(exampleData)).map((id) => (
-          <button key={id} onClick={() => dispatch({ type: "FOCUS_SURFACE", id })}>
+          <button key={id} onClick={() => dispatch({ type: "FOCUS_SURFACE", surfaceId: id })}>
             {id}
           </button>
         ))}
