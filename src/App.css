@@ -22,20 +22,19 @@
 
 .surface-overlay {
     position: absolute;
-    top: 0;
-    left: 0;
+    top: 4px;
+    right: 3px;
     background-color: rgba(0, 0, 0, 0.7);
     color: white;
     padding: 4px 8px;
     font-size: 12px;
-    border-radius: 4px;
+    border-radius: 12px;
     pointer-events: none;
     z-index: 1000;
 }
 
 .surface-wrapper {
     position: relative;
-    margin-bottom: 10px;
 }
 
 .toolbar {

@@ -3,7 +3,10 @@ import viteLogo from "/vite.svg";
 import "./App.css";
 import { useValue } from "signia-react";
 import { atom } from "signia";
+import { produce } from "immer";
+import { useMemo } from "react";
 
+// --- DATA  -------------------------------------------------------------------
 type Datum = (
   | { type: "list"; data: { items: string[] } }
   | { type: "card"; data: { title: string; description: string } }
@@ -25,8 +28,7 @@ const viteCard: Datum = {
   type: "card",
   data: {
     title: "Vite",
-    description:
-      "A build tool that aims to provide a faster and leaner development experience for modern web projects",
+    description: "A build tool that aims to provide a faster and leaner development experience for modern web projects",
   },
 };
 
@@ -42,6 +44,7 @@ const exampleData: Datum[] = [
   },
 ];
 
+// --- SURFACE PROVIDERS ------------------------------------------------------
 type SurfaceProvider = (data: Datum) => React.ReactElement | undefined;
 
 const ListProvider: SurfaceProvider = (datum) => {
@@ -53,10 +56,7 @@ const ListProvider: SurfaceProvider = (datum) => {
       <ul>
         {datum.data.items.map((item, index) => (
           <li key={index}>
-            <img
-              src={item === "React" ? reactLogo : viteLogo}
-              alt={`${item} logo`}
-            />
+            <img src={item === "React" ? reactLogo : viteLogo} alt={`${item} logo`} />
             <span>{item}</span>
           </li>
         ))}
@@ -92,15 +92,25 @@ const StackProvider: SurfaceProvider = (datum) => {
   );
 };
 
-const surfaceProviders: SurfaceProvider[] = [
-  ListProvider,
-  CardProvider,
-  StackProvider,
-];
+const surfaceProviders: SurfaceProvider[] = [ListProvider, CardProvider, StackProvider];
+
+// --- Instance management ----------------------------------------------------
+const surfaceInstances = {} as Record<number, number>;
+
+const getSurfaceInstance = (id: number) => {
+  if (!surfaceInstances[id]) {
+    surfaceInstances[id] = 0;
+  }
+  return surfaceInstances[id]++;
+};
+
+// --- SURFACE COMPONENT ------------------------------------------------------
 
 function Surface({ datum }: { datum: Datum }) {
-  const { overlays } = useValue(appState$);
+  const { overlays } = useValue(state$);
+
   const provider = surfaceProviders.find((provider) => provider(datum));
+  const instance = useMemo(() => getSurfaceInstance(datum.id), [datum.id]);
 
   if (!provider) {
     return (
@@ -113,12 +123,12 @@ function Surface({ datum }: { datum: Datum }) {
 
   return (
     <div className="surface-wrapper">
-      <div role="none" data-surfaceid={datum.id} data-surfacetype={datum.type}>
+      <div role="none" data-surfaceid={datum.id} data-surfacetype={datum.type} data-surfaceinstance={instance}>
         {provider(datum)}
       </div>
       {overlays && (
         <div className="surface-overlay">
-          ID: {datum.id}, Type: {datum.type}
+          ID: <code>{datum.id}</code>, Type: <code>{datum.type}</code>, Instance: <code>{instance}</code>
         </div>
       )}
     </div>
@@ -126,28 +136,12 @@ function Surface({ datum }: { datum: Datum }) {
 }
 
 // --- APP LAND CODE ----------------------------------------------------------
-const appState$ = atom("state", {
-  overlays: false,
-});
+const state$ = atom("state", { overlays: true });
 
 function App() {
   return (
     <div role="main">
       <h1>Surface experiment ✨</h1>
-
-      <div className="toolbar">
-        <button
-          onClick={() =>
-            appState$.update((v) => ({
-              ...v,
-              overlays: !v.overlays,
-            }))
-          }
-        >
-          Toggle surface overlays
-        </button>
-        {/* More buttons can be added here in the future */}
-      </div>
 
       {exampleData.map((datum) => (
         <Surface key={datum.id} datum={datum} />
