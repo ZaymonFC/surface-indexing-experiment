@@ -13,7 +13,7 @@ type Datum = ({ type: "card"; data: { title: string; description: string } } | {
 
 // Define the cards separately
 const reactCard: Datum = {
-  id: 3,
+  id: 0,
   type: "card",
   data: {
     title: "React",
@@ -22,7 +22,7 @@ const reactCard: Datum = {
 };
 
 const viteCard: Datum = {
-  id: 4,
+  id: 1,
   type: "card",
   data: {
     title: "Vite",
@@ -31,19 +31,19 @@ const viteCard: Datum = {
 };
 
 const deepStack: Datum = {
-  id: 8,
+  id: 5,
   type: "stack",
   data: [viteCard],
 };
 
 const stack: Datum = {
-  id: 7,
+  id: 4,
   type: "stack",
   data: [reactCard, deepStack],
 };
 
 const anotherStack: Datum = {
-  id: 6,
+  id: 3,
   type: "stack",
   data: [reactCard, viteCard, stack],
 };
@@ -52,7 +52,7 @@ const exampleData: Datum[] = [
   reactCard,
   viteCard,
   {
-    id: 5,
+    id: 2,
     type: "stack",
     data: [reactCard, viteCard, anotherStack, deepStack],
   },
