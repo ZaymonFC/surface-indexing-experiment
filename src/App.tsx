@@ -1,19 +1,15 @@
-import reactLogo from "./assets/react.svg";
-import viteLogo from "/vite.svg";
 import "./App.css";
 import { useValue } from "signia-react";
 import { atom } from "signia";
 import { produce } from "immer";
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, RefObject, useContext, useEffect, useRef, useState } from "react";
 import { match } from "ts-pattern";
 import classNames from "classnames";
 
 // --- DATA  -------------------------------------------------------------------
-type Datum = (
-  | { type: "list"; data: { items: string[] } }
-  | { type: "card"; data: { title: string; description: string } }
-  | { type: "stack"; data: Datum[] }
-) & { id: number };
+type Datum = ({ type: "card"; data: { title: string; description: string } } | { type: "stack"; data: Datum[] }) & {
+  id: number;
+};
 
 // Define the cards separately
 const reactCard: Datum = {
@@ -73,59 +69,73 @@ const collectIds = (data: Datum[]): Set<number> => {
   );
 };
 
-// --- SURFACE PROVIDERS ------------------------------------------------------
-type SurfaceProvider = (data: Datum) => React.ReactElement | undefined;
+// --- SCROLL INTO VIEW -------------------------------------------------------
+interface ScrollOptions {
+  behavior?: ScrollBehavior;
+  block?: ScrollLogicalPosition;
+  inline?: ScrollLogicalPosition;
+}
 
-const ListProvider: SurfaceProvider = (datum) => {
-  if (datum.type !== "list") return;
+function useScrollIntoView(
+  ref: RefObject<HTMLElement>,
+  options: ScrollOptions = { behavior: "smooth", block: "center", inline: "nearest" },
+) {
+  const parentContext = useContext(SurfaceContext);
+  const { focus } = useValue(state$);
 
+  useEffect(() => {
+    if (focus && parentContext && focus.id === parentContext.id && focus.instance === parentContext.instance) {
+      ref.current?.scrollIntoView(options);
+    }
+  }, [focus, parentContext, ref, options]);
+}
+
+// --- USERLAND COMPONENTS -----------------------------------------------------
+// Note: Types are nasty because I'm lazy.
+const Card = ({ data }: { data: Extract<Datum, { type: "card" }>["data"] }) => {
+  const focusRef = useRef<HTMLDivElement>(null);
+  useScrollIntoView(focusRef);
   return (
-    <div className="container">
-      <p>I am a list surface.</p>
-      <ul>
-        {datum.data.items.map((item, index) => (
-          <li key={index}>
-            <img src={item === "React" ? reactLogo : viteLogo} alt={`${item} logo`} />
-            <span>{item}</span>
-          </li>
-        ))}
-      </ul>
+    <div ref={focusRef} className="container card-container">
+      <p>I am a card surface.</p>
+      <div className="card-content">
+        <h2>{data.title}</h2>
+        <p>{data.description}</p>
+      </div>
     </div>
   );
 };
 
-const CardProvider: SurfaceProvider = (datum) => {
-  if (datum.type !== "card") return;
+const Stack = ({ data }: { data: Extract<Datum, { type: "stack" }>["data"] }) => {
+  const focusRef = useRef<HTMLDivElement>(null);
+  useScrollIntoView(focusRef);
 
   return (
-    <div className="container card">
-      <p>
-        I am a <strong>card</strong> surface.
-      </p>
-      <h2>{datum.data.title}</h2>
-      <p>{datum.data.description}</p>
-    </div>
-  );
-};
-
-const StackProvider: SurfaceProvider = (datum) => {
-  if (datum.type !== "stack") return;
-
-  return (
-    <div className="container stack-container">
-      <p>
-        I am a <strong>stack</strong> surface.
-      </p>
+    <div ref={focusRef} className="container stack-container">
+      <p>I am a stack surface.</p>
       <div className="stack-content">
-        {datum.data.map((subDatum) => (
-          <Surface key={subDatum.id} datum={subDatum} />
+        {data.map((datum) => (
+          <Surface key={datum.id} datum={datum} />
         ))}
       </div>
     </div>
   );
 };
 
-const surfaceProviders: SurfaceProvider[] = [ListProvider, CardProvider, StackProvider];
+// --- SURFACE PROVIDERS ------------------------------------------------------
+type SurfaceProvider = (data: Datum) => React.ReactElement | undefined;
+
+const CardProvider: SurfaceProvider = (datum) => {
+  if (datum.type !== "card") return;
+  return <Card data={datum.data} />;
+};
+
+const StackProvider: SurfaceProvider = (datum) => {
+  if (datum.type !== "stack") return;
+  return <Stack data={datum.data} />;
+};
+
+const surfaceProviders: SurfaceProvider[] = [CardProvider, StackProvider];
 
 // --- Instance management ----------------------------------------------------
 const surfaceInstances = {} as Record<number, number[]>;
@@ -258,14 +268,16 @@ const dispatch = (event: AppEvent) => {
 function App() {
   return (
     <div role="main" className="flex flex-column gap-2">
-      <h1>Surface experiment ✨</h1>
+      <div role="navigation" className="nav">
+        <h1>Surface experiment ✨</h1>
 
-      <div role="none" className="flex flex-row gap-2">
-        {Array.from(collectIds(exampleData)).map((id) => (
-          <button key={id} onClick={() => dispatch({ type: "FOCUS_SURFACE", surfaceId: id })}>
-            {id}
-          </button>
-        ))}
+        <div role="none" className="flex flex-row gap-2">
+          {Array.from(collectIds(exampleData)).map((id) => (
+            <button key={id} onClick={() => dispatch({ type: "FOCUS_SURFACE", surfaceId: id })}>
+              {id}
+            </button>
+          ))}
+        </div>
       </div>
 
       {exampleData.map((datum) => (
